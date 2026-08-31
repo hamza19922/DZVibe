@@ -1,63 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View, Dimensions } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { supabase } from './lib/supabase';
 
 const { height } = Dimensions.get('window');
 
-const FEED = [
-  { id: '1', user: '@dzvibe', title: 'مرحبا بكم في DZVibe 🇩🇿', description: 'منصة الفيديو الجزائرية الجديدة — أول نسخة تجريبية.', video: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' },
-  { id: '2', user: '@dzvibe', title: 'اكتشف عالم الفيديو القصير', description: 'واجهة عمودية سريعة مصممة للهاتف.', video: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4' }
-];
-
-function FeedCard({ item, active, liked, onLike }) {
-  const player = useVideoPlayer(item.video, p => { p.loop = true; p.muted = false; });
-  useEffect(() => { if (active) player.play(); else player.pause(); }, [active, player]);
-  const actions = [
-    { icon: liked ? '♥' : '♡', label: liked ? 'أعجبني' : 'إعجاب', onPress: onLike },
-    { icon: '◉', label: 'تعليق', onPress: () => Alert.alert('التعليقات', 'قسم التعليقات جاهز للربط في الخطوة التالية.') },
-    { icon: '↗', label: 'مشاركة', onPress: () => Alert.alert('مشاركة', 'ميزة المشاركة جاهزة للربط في الخطوة التالية.') },
-    { icon: '☰', label: 'المزيد', onPress: () => Alert.alert('المزيد', 'هذه قائمة خيارات الفيديو.') }
-  ];
-  return (
-    <View style={styles.card}>
-      <VideoView player={player} style={styles.video} contentFit="cover" nativeControls={false} allowsFullscreen allowsPictureInPicture />
-      <View pointerEvents="none" style={styles.scrim} />
-      <View pointerEvents="none" style={styles.topBar}><Text style={styles.logo}>DZVibe</Text><Text style={styles.badge}>FOR YOU</Text></View>
-      <View pointerEvents="none" style={styles.info}><Text style={styles.user}>{item.user}</Text><Text style={styles.title}>{item.title}</Text><Text style={styles.description}>{item.description}</Text></View>
-      <View style={styles.actions}>
-        {actions.map((action, index) => <Pressable key={index} style={({ pressed }) => [styles.action, pressed && styles.pressed]} onPress={action.onPress} hitSlop={8}><Text style={[styles.actionIcon, liked && index === 0 && styles.liked]}>{action.icon}</Text><Text style={styles.actionText}>{action.label}</Text></Pressable>)}
-      </View>
-    </View>
-  );
+function Auth({ onLogin }) {
+  const [signup, setSignup] = useState(false), [email, setEmail] = useState(''), [password, setPassword] = useState(''), [username, setUsername] = useState(''), [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!email.trim() || password.length < 6 || (signup && !username.trim())) return Alert.alert('بيانات ناقصة', 'أدخل البيانات المطلوبة.');
+    setBusy(true);
+    try {
+      if (signup) {
+        const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (error) throw error;
+        if (!data.user) throw new Error('تعذر إنشاء الحساب.');
+        const p = await supabase.from('profiles').upsert({ id: data.user.id, username: clean, display_name: username.trim(), bio: '' }, { onConflict: 'id' });
+        if (p.error) throw p.error;
+        if (data.session) onLogin(data.user); else Alert.alert('تم إنشاء الحساب', 'تحقق من بريدك إذا طُلب منك ذلك، ثم سجّل الدخول.');
+        setSignup(false);
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error; onLogin(data.user);
+      }
+    } catch (e) { Alert.alert('تعذر المتابعة', e.message || 'حدث خطأ.'); } finally { setBusy(false); }
+  };
+  return <View style={s.auth}><StatusBar style="light" hidden /><Text style={s.brand}>DZVibe</Text><Text style={s.muted}>منصة الفيديو الجزائرية 🇩🇿</Text><View style={s.authCard}><Text style={s.h1}>{signup ? 'إنشاء حساب' : 'تسجيل الدخول'}</Text>{signup && <TextInput value={username} onChangeText={setUsername} placeholder="اسم المستخدم" placeholderTextColor="#777" autoCapitalize="none" style={s.input}/>}<TextInput value={email} onChangeText={setEmail} placeholder="البريد الإلكتروني" placeholderTextColor="#777" keyboardType="email-address" autoCapitalize="none" style={s.input}/><TextInput value={password} onChangeText={setPassword} placeholder="كلمة المرور" placeholderTextColor="#777" secureTextEntry style={s.input}/><Pressable disabled={busy} onPress={submit} style={s.primary}><Text style={s.primaryText}>{busy ? 'جارٍ التنفيذ...' : signup ? 'إنشاء الحساب' : 'دخول'}</Text></Pressable><Pressable onPress={() => setSignup(!signup)}><Text style={s.switch}>{signup ? 'لديك حساب؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب'}</Text></Pressable></View></View>;
 }
 
-export default function App() {
-  const [active, setActive] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [section, setSection] = useState('الرئيسية');
-  const selectSection = (name) => { setSection(name); if (name !== 'الرئيسية') Alert.alert(name, `تم فتح قسم ${name}. سنضيف محتواه الكامل في الخطوة التالية.`); };
-  return (
-    <View style={styles.container}>
-      <StatusBar style="light" hidden />
-      <View style={styles.feed}>{FEED.map((item, index) => <View key={item.id} style={styles.cardWrap}><FeedCard item={item} active={active === index} liked={liked} onLike={() => setLiked(value => !value)} /></View>)}</View>
-      <View style={styles.bottomNav}>
-        <Pressable onPress={() => selectSection('الرئيسية')} style={styles.navButton} hitSlop={8}><Text style={[styles.nav, section === 'الرئيسية' && styles.navActive]}>الرئيسية</Text></Pressable>
-        <Pressable onPress={() => selectSection('اكتشف')} style={styles.navButton} hitSlop={8}><Text style={[styles.nav, section === 'اكتشف' && styles.navActive]}>اكتشف</Text></Pressable>
-        <Pressable onPress={() => Alert.alert('إضافة فيديو', 'زر الإضافة يعمل الآن. رفع الفيديو سنوصله في الخطوة التالية.')} style={styles.plus} hitSlop={8}><Text style={styles.plusText}>＋</Text></Pressable>
-        <Pressable onPress={() => selectSection('الوارد')} style={styles.navButton} hitSlop={8}><Text style={[styles.nav, section === 'الوارد' && styles.navActive]}>الوارد</Text></Pressable>
-        <Pressable onPress={() => selectSection('حسابي')} style={styles.navButton} hitSlop={8}><Text style={[styles.nav, section === 'حسابي' && styles.navActive]}>حسابي</Text></Pressable>
-      </View>
-    </View>
-  );
+function Card({ item, active, liked, saved, like, save, comments }) {
+  const player = useVideoPlayer(item.video_url, p => { p.loop = true; p.muted = false; });
+  useEffect(() => { active ? player.play() : player.pause(); }, [active, player]);
+  return <View style={s.card}><VideoView player={player} style={s.video} contentFit="cover" nativeControls={false}/><View pointerEvents="none" style={s.shade}/><View style={s.top}><Text style={s.logo}>DZVibe</Text><Text style={s.tab}>لك</Text><Text style={s.tab}>اكتشف</Text><Text style={s.tab}>الأصدقاء</Text><Text style={s.tab}>LIVE</Text></View><View pointerEvents="none" style={s.info}><Text style={s.loc}>⌖ {item.location_name || 'الجزائر'}</Text><Text style={s.user}>{item.profiles?.display_name || item.profiles?.username || 'DZVibe'}</Text><Text style={s.caption}>{item.caption}</Text><Text style={s.sound}>♫ {item.sound_name || 'الصوت الأصلي'}</Text></View><View style={s.actions}><Pressable onPress={like}><Text style={[s.icon, liked && s.yellow]}>♥</Text><Text style={s.count}>{item.like_count || 0}</Text></Pressable><Pressable onPress={comments}><Text style={s.icon}>●●●</Text><Text style={s.count}>{item.comment_count || 0}</Text></Pressable><Pressable onPress={() => Alert.alert('مشاركة','سنربط المشاركة الأصلية في المرحلة التالية.')}><Text style={s.icon}>↗</Text><Text style={s.count}>{item.share_count || 0}</Text></Pressable><Pressable onPress={save}><Text style={[s.icon, saved && s.yellow]}>▮</Text><Text style={s.count}>{item.save_count || 0}</Text></Pressable></View></View>;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' }, feed: { flex: 1 }, cardWrap: { height }, card: { flex: 1, backgroundColor: '#000', overflow: 'hidden' }, video: { ...StyleSheet.absoluteFillObject }, scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.12)' },
-  topBar: { position: 'absolute', top: 46, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, logo: { color: '#FFD400', fontSize: 24, fontWeight: '900' }, badge: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  info: { position: 'absolute', left: 20, right: 92, bottom: 110 }, user: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 8 }, title: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 6 }, description: { color: '#eee', fontSize: 15, lineHeight: 22 },
-  actions: { position: 'absolute', right: 12, bottom: 118, alignItems: 'center', gap: 18 }, action: { alignItems: 'center', minWidth: 58, paddingVertical: 3 }, pressed: { opacity: 0.55, transform: [{ scale: 0.94 }] }, actionIcon: { color: '#fff', fontSize: 31, fontWeight: '700' }, liked: { color: '#FFD400' }, actionText: { color: '#fff', fontSize: 11, marginTop: 2 },
-  // Lift the app navigation above Android's system navigation area.
-  bottomNav: { position: 'absolute', bottom: 24, left: 0, right: 0, height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.82)', borderRadius: 18, marginHorizontal: 8 },
-  navButton: { minWidth: 50, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, nav: { color: '#aaa', fontSize: 11, fontWeight: '700' }, navActive: { color: '#fff', fontSize: 11, fontWeight: '900' }, plus: { width: 48, height: 34, borderRadius: 10, backgroundColor: '#FFD400', alignItems: 'center', justifyContent: 'center' }, plusText: { color: '#000', fontSize: 26, lineHeight: 28, fontWeight: '900' }
-});
+function Comments({ video, user, close }) {
+  const [rows,setRows]=useState([]), [text,setText]=useState('');
+  const load=async()=>{const {data}=await supabase.from('comments').select('id,body,created_at,profiles(username,display_name)').eq('video_id',video.id).is('parent_id',null).order('created_at',{ascending:false});setRows(data||[])};
+  useEffect(()=>{load()},[video.id]);
+  const add=async()=>{if(!text.trim())return;const {error}=await supabase.from('comments').insert({video_id:video.id,user_id:user.id,body:text.trim()});if(error)Alert.alert('خطأ',error.message);else{setText('');load()}};
+  return <Modal visible transparent animationType="slide" onRequestClose={close}><View style={s.back}><View style={s.commentBox}><View style={s.row}><Text style={s.h2}>التعليقات</Text><Pressable onPress={close}><Text style={s.close}>×</Text></Pressable></View><ScrollView style={{flex:1}}>{rows.map(x=><View key={x.id} style={s.comment}><Text style={s.commentUser}>{x.profiles?.display_name||x.profiles?.username||'مستخدم'}</Text><Text style={s.commentBody}>{x.body}</Text></View>)}{!rows.length&&<Text style={s.muted}>لا توجد تعليقات بعد.</Text>}</ScrollView><View style={s.row}><TextInput value={text} onChangeText={setText} placeholder="اكتب تعليقًا..." placeholderTextColor="#777" style={s.commentInput}/><Pressable onPress={add} style={s.send}><Text style={{color:'#000',fontWeight:'900'}}>إرسال</Text></Pressable></View></View></View></Modal>;
+}
+
+export default function App(){
+ const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[feed,setFeed]=useState([]),[active,setActive]=useState(0),[liked,setLiked]=useState(new Set()),[saved,setSaved]=useState(new Set()),[commentVideo,setCommentVideo]=useState(null),[tab,setTab]=useState('الرئيسية'),[loading,setLoading]=useState(true);
+ const load=async(u)=>{const p=await supabase.from('profiles').select('*').eq('id',u.id).maybeSingle();setProfile(p.data);const q=await supabase.from('videos').select('id,user_id,caption,video_url,thumbnail_url,location_name,sound_name,view_count,like_count,comment_count,share_count,save_count,created_at,profiles(username,display_name,avatar_url,is_verified)').eq('status','published').eq('visibility','public').order('created_at',{ascending:false}).limit(30);setFeed(q.data||[]);const ids=(q.data||[]).map(v=>v.id);if(ids.length){const [a,b]=await Promise.all([supabase.from('video_likes').select('video_id').eq('user_id',u.id).in('video_id',ids),supabase.from('video_saves').select('video_id').eq('user_id',u.id).in('video_id',ids)]);setLiked(new Set((a.data||[]).map(x=>x.video_id)));setSaved(new Set((b.data||[]).map(x=>x.video_id)));}};
+ useEffect(()=>{(async()=>{const {data}=await supabase.auth.getSession();if(data.session){setUser(data.session.user);await load(data.session.user)}setLoading(false)})();const {data}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user||null);if(session?.user)load(session.user);else{setProfile(null);setFeed([])}});return()=>data.subscription.unsubscribe()},[]);
+ const toggle=async(v,type)=>{if(!user)return;const set=type==='like'?liked:saved,table=type==='like'?'video_likes':'video_saves',has=set.has(v.id);if(has){await supabase.from(table).delete().eq('video_id',v.id).eq('user_id',user.id);const n=new Set(set);n.delete(v.id);type==='like'?setLiked(n):setSaved(n)}else{const {error}=await supabase.from(table).insert({video_id:v.id,user_id:user.id});if(!error){const n=new Set(set);n.add(v.id);type==='like'?setLiked(n):setSaved(n)}}};
+ if(loading)return <View style={s.loading}><Text style={s.brand}>DZVibe</Text><Text style={s.muted}>جارٍ التشغيل...</Text></View>; if(!user)return <Auth onLogin={async u=>{setUser(u);await load(u)}}/>;
+ if(tab==='أنا')return <View style={s.profile}><Text style={s.h1}>ملفي الشخصي</Text><View style={s.avatar}><Text style={s.avatarText}>{(profile?.display_name||'D')[0]}</Text></View><Text style={s.profileName}>{profile?.display_name||'مستخدم DZVibe'}</Text><Text style={s.muted}>@{profile?.username||'user'}</Text><Pressable style={s.primary} onPress={()=>supabase.auth.signOut()}><Text style={s.primaryText}>تسجيل الخروج</Text></Pressable><Nav tab={tab} setTab={setTab}/></View>;
+ return <View style={s.container}>{feed.length?<ScrollView pagingEnabled showsVerticalScrollIndicator={false} onMomentumScrollEnd={e=>setActive(Math.round(e.nativeEvent.contentOffset.y/height))}>{feed.map((v,i)=><View key={v.id} style={{height}}><Card item={v} active={active===i} liked={liked.has(v.id)} saved={saved.has(v.id)} like={()=>toggle(v,'like')} save={()=>toggle(v,'save')} comments={()=>setCommentVideo(v)}/></View>)}</ScrollView>:<View style={s.empty}><Text style={s.brand}>DZVibe</Text><Text style={s.h2}>لا توجد فيديوهات منشورة بعد</Text><Text style={s.muted}>قاعدة البيانات حقيقية. الخطوة التالية هي رفع الفيديو من الهاتف.</Text></View>}<Nav tab={tab} setTab={setTab}/>{commentVideo&&<Comments video={commentVideo} user={user} close={()=>setCommentVideo(null)}/>}</View>;
+}
+function Nav({tab,setTab}){return <View style={s.nav}><Pressable onPress={()=>setTab('الرئيسية')}><Text style={[s.navText,tab==='الرئيسية'&&s.white]}>⌂\nالرئيسية</Text></Pressable><Pressable onPress={()=>Alert.alert('اكتشف','سنضيف البحث والتوصيات في المرحلة التالية.')}><Text style={s.navText}>◉\nاكتشف</Text></Pressable><Pressable style={s.plus} onPress={()=>Alert.alert('إنشاء فيديو','رفع الفيديو من الهاتف هو الخطوة التالية.')}><Text style={s.plusText}>＋</Text></Pressable><Pressable onPress={()=>Alert.alert('الإشعارات','سنربط الإشعارات الحقيقية في المرحلة التالية.')}><Text style={s.navText}>♧\nالإشعارات</Text></Pressable><Pressable onPress={()=>setTab('أنا')}><Text style={[s.navText,tab==='أنا'&&s.white]}>♙\nأنا</Text></Pressable></View>}
+const s=StyleSheet.create({container:{flex:1,backgroundColor:'#000'},loading:{flex:1,backgroundColor:'#000',alignItems:'center',justifyContent:'center'},brand:{color:'#FFD400',fontSize:40,fontWeight:'900'},muted:{color:'#888',textAlign:'center',marginTop:8},auth:{flex:1,backgroundColor:'#050505',alignItems:'center',justifyContent:'center',padding:20},authCard:{width:'100%',maxWidth:420,backgroundColor:'#111',borderRadius:24,padding:22,marginTop:24},h1:{color:'#fff',fontSize:26,fontWeight:'900',textAlign:'right',marginBottom:18},h2:{color:'#fff',fontSize:20,fontWeight:'900'},input:{height:52,borderRadius:14,borderWidth:1,borderColor:'#333',backgroundColor:'#080808',color:'#fff',paddingHorizontal:14,marginBottom:12,textAlign:'right'},primary:{height:52,borderRadius:15,backgroundColor:'#FFD400',alignItems:'center',justifyContent:'center',marginTop:8,paddingHorizontal:28},primaryText:{color:'#000',fontWeight:'900',fontSize:16},switch:{color:'#aaa',textAlign:'center',padding:16},card:{flex:1,backgroundColor:'#000'},video:{...StyleSheet.absoluteFillObject},shade:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(0,0,0,.16)'},top:{position:'absolute',top:42,left:18,right:18,flexDirection:'row',alignItems:'center',gap:13},logo:{color:'#FFD400',fontSize:22,fontWeight:'900',marginRight:'auto'},tab:{color:'#fff',fontSize:12,fontWeight:'700'},info:{position:'absolute',left:18,right:80,bottom:115},loc:{color:'#fff',fontSize:12,marginBottom:8},user:{color:'#fff',fontSize:18,fontWeight:'900'},caption:{color:'#fff',fontSize:15,lineHeight:23,marginTop:5},sound:{color:'#ddd',fontSize:13,marginTop:9},actions:{position:'absolute',right:10,bottom:128,alignItems:'center',gap:20},icon:{color:'#fff',fontSize:27,fontWeight:'900',textAlign:'center'},yellow:{color:'#FFD400'},count:{color:'#fff',fontSize:11,textAlign:'center',marginTop:2},nav:{position:'absolute',bottom:24,left:8,right:8,height:68,borderRadius:20,backgroundColor:'rgba(8,8,8,.95)',borderWidth:1,borderColor:'#222',paddingHorizontal:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},navText:{color:'#888',fontSize:10,textAlign:'center',lineHeight:17,fontWeight:'700'},white:{color:'#fff'},plus:{width:52,height:44,borderRadius:16,backgroundColor:'#FFD400',alignItems:'center',justifyContent:'center'},plusText:{color:'#000',fontSize:30,fontWeight:'900'},empty:{flex:1,backgroundColor:'#000',alignItems:'center',justifyContent:'center',padding:30},profile:{flex:1,backgroundColor:'#050505',alignItems:'center',paddingTop:70},avatar:{width:96,height:96,borderRadius:48,backgroundColor:'#222',borderWidth:2,borderColor:'#FFD400',alignItems:'center',justifyContent:'center',marginBottom:12},avatarText:{color:'#FFD400',fontSize:40,fontWeight:'900'},profileName:{color:'#fff',fontSize:22,fontWeight:'900'},back:{flex:1,backgroundColor:'rgba(0,0,0,.7)',justifyContent:'flex-end'},commentBox:{height:'70%',backgroundColor:'#111',borderTopLeftRadius:24,borderTopRightRadius:24,padding:18},row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},close:{color:'#fff',fontSize:30},comment:{paddingVertical:12,borderBottomWidth:1,borderBottomColor:'#222'},commentUser:{color:'#FFD400',fontWeight:'800'},commentBody:{color:'#eee',marginTop:4},commentInput:{flex:1,height:48,borderRadius:14,borderWidth:1,borderColor:'#333',color:'#fff',paddingHorizontal:12,textAlign:'right'},send:{height:48,paddingHorizontal:15,borderRadius:14,backgroundColor:'#FFD400',alignItems:'center',justifyContent:'center'}});
