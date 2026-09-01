@@ -2,16 +2,15 @@
   "expo": {
     "name": "DZVibe",
     "slug": "dzvibe",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "android": {
       "package": "com.dzvibe.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "navigationBarColor": "#050505",
-      "navigationBarDividerColor": "#050505",
-      "edgeToEdgeEnabled": false
+      "navigationBarDividerColor": "#050505"
     },
     "ios": {
       "bundleIdentifier": "com.dzvibe.app"
