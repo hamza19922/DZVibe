@@ -16,6 +16,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
       - name: Install dependencies
         run: npm install
@@ -23,10 +30,19 @@ jobs:
       - name: Expo doctor
         run: npx expo-doctor@latest
 
-      - name: Install EAS CLI
-        run: npm install --global eas-cli
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --non-interactive
 
-      - name: Build Android APK
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive --wait
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Prepare APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk DZVibe-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DZVibe-APK
+          path: DZVibe-debug.apk
+          if-no-files-found: error
