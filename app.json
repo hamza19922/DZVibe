@@ -2,14 +2,14 @@
   "expo": {
     "name": "DZVibe",
     "slug": "dzvibe",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "jsEngine": "jsc",
+    "jsEngine": "hermes",
     "android": {
       "package": "com.dzvibe.app",
-      "versionCode": 6,
-      "jsEngine": "jsc",
+      "versionCode": 7,
+      "jsEngine": "hermes",
       "navigationBarColor": "#050505",
       "navigationBarDividerColor": "#050505"
     },
