@@ -1,13 +1,12 @@
-name: DZVibe CI
+name: DZVibe Web Deploy
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  validate:
+  deploy-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,8 +23,13 @@ jobs:
       - name: Expo doctor
         run: npx expo-doctor@latest
 
-      - name: Export Android bundle
-        run: npx expo export --platform android
-
-      - name: Export Web bundle
+      - name: Export Web
         run: npx expo export --platform web
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Deploy to EAS Hosting
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas deploy --non-interactive
