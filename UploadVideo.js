@@ -13,7 +13,7 @@ export default function UploadVideo({ user, onDone, onCancel }) {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return Alert.alert('صلاحية مطلوبة', 'اسمح للتطبيق بالوصول إلى الفيديوهات من إعدادات الهاتف.');
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 1 });
-    if (!result.canceled) setVideo(result.assets[0]);
+    if (!result.canceled && result.assets?.[0]) setVideo(result.assets[0]);
   };
 
   const publish = async () => {
@@ -23,6 +23,7 @@ export default function UploadVideo({ user, onDone, onCancel }) {
       const ext = (video.fileName?.split('.').pop() || 'mp4').toLowerCase();
       const path = `${user.id}/${Date.now()}.${ext}`;
       const response = await fetch(video.uri);
+      if (!response.ok) throw new Error('تعذر قراءة ملف الفيديو من الهاتف.');
       const blob = await response.blob();
       const upload = await supabase.storage.from('videos').upload(path, blob, {
         contentType: video.mimeType || 'video/mp4',
