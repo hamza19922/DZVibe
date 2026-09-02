@@ -15,22 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply auth recovery patch
-        run: python3 scripts/patch-auth.py
-
-      - name: Remove one-time patch workflow
-        run: rm -f .github/workflows/finish-auth.yml
-
-      - name: Commit completed source patch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Complete DZVibe password recovery flow [skip ci]"
-            git push
-          fi
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
