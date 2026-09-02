@@ -1,4 +1,4 @@
-name: DZVibe Web Deploy
+name: DZVibe Web Export
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-web:
+  export-web:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,10 +26,9 @@ jobs:
       - name: Export Web
         run: npx expo export --platform web
 
-      - name: Install EAS CLI
-        run: npm install --global eas-cli
-
-      - name: Deploy to EAS Hosting
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas deploy --non-interactive
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: DZVibe-Web
+          path: dist
+          if-no-files-found: error
