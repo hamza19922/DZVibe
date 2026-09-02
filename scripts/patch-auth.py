@@ -3,6 +3,11 @@ from pathlib import Path
 path = Path('App.js')
 text = path.read_text(encoding='utf-8')
 
+# The release workflow can run more than once. If the recovery flow is already
+# present, leave the source untouched so repeated builds remain deterministic.
+if 'function PasswordRecovery({onDone})' in text and 'نسيت كلمة المرور؟' in text:
+    raise SystemExit(0)
+
 if "import * as Linking from 'expo-linking';" not in text:
     text = text.replace(
         "import{StatusBar}from'expo-status-bar';",
