@@ -2,13 +2,13 @@
   "expo": {
     "name": "DZVibe",
     "slug": "dzvibe",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "scheme": "dzvibe",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "android": {
       "package": "com.dzvibe.app",
-      "versionCode": 9
+      "versionCode": 10
     },
     "ios": {
       "bundleIdentifier": "com.dzvibe.app"
